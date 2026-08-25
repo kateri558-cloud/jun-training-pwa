@@ -57,7 +57,7 @@ input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;paddin
 
 <div id="editModal" class="modal" onclick="outsideClose(event,'editModal')"><div class="sheet">
 <h2 id="modalTitle">種目を編集</h2><div class="grid">
-<div class="field full"><label>種目名</label><input id="fName"></div><div class="field"><label>セット数</label><input id="fSets" type="number" min="1" max="10"></div><div class="field"><label>休憩（分）</label><input id="fRest" type="number" min="0" step="0.5"></div>
+<div class="field full"><label>種目名</label><input id="fName"></div><div class="field"><label>セット数</label><input id="fSets" type="number" min="1" max="10"></div><div class="field"><label>休憩（分）</label><input id="fRest" type="number" min="0" step="0.5"></div><div class="field"><label>想定時間（分）</label><input id="fMinutes" type="number" min="0" step="1"></div>
 <div class="field full"><label>回数の目安</label><input id="fTarget"></div><div class="field"><label>メイン重量（kg・任意）</label><input id="fKg" inputmode="decimal"></div><div class="field"><label>メモ（任意）</label><input id="fNote"></div><div class="field full"><label>アップ内容（任意）</label><input id="fWarmup"></div>
 </div><div class="sheetactions"><button class="danger" id="deleteBtn" onclick="deleteExercise()">削除</button><button class="primary" onclick="saveExercise()">保存</button></div><button class="btn" style="width:100%;margin-top:8px" onclick="closeModal('editModal')">キャンセル</button></div></div>
 
@@ -85,25 +85,34 @@ input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;paddin
 <script>
 const defaults={
 A:{title:"A｜休日",minutes:86,ex:[
-{name:"15° ベンチプレス",sets:4,target:"8〜10回",rest:3,kg:30,warmup:"20kg×10 → 25kg×5 → 27.5kg×2（休憩なし）→ 3分休憩",note:""},
-{name:"バーベルショルダープレス",sets:2,target:"10〜12回",rest:3,kg:"",warmup:"",note:""},
-{name:"サイドレイズ",sets:4,target:"15〜20回",rest:1,kg:"",warmup:"",note:""},
-{name:"ルーマニアンデッドリフト",sets:3,target:"8〜10回",rest:3,kg:30,warmup:"15kg×10 → 3分休憩",note:""},
-{name:"プルアップ",sets:3,target:"5〜8回",rest:3,kg:"",warmup:"",note:""},
-{name:"サポートダンベルロウ",sets:2,target:"12〜15回",rest:3,kg:"",warmup:"",note:"胸をベンチで支えて引く"},
-{name:"ワイドスクワット",sets:2,target:"10〜12回",rest:3,kg:30,warmup:"15kg×10 → 3分休憩",note:""}]},
+{name:"15° ベンチプレス",sets:4,target:"8〜10回",rest:3,minutes:22,kg:30,warmup:"20kg×10 → 25kg×5 → 27.5kg×2（休憩なし）→ 3分休憩",note:""},
+{name:"バーベルショルダープレス",sets:2,target:"10〜12回",rest:3,minutes:8,kg:"",warmup:"",note:""},
+{name:"サイドレイズ",sets:4,target:"15〜20回",rest:1,minutes:8,kg:"",warmup:"",note:""},
+{name:"ルーマニアンデッドリフト",sets:3,target:"8〜10回",rest:3,minutes:16,kg:30,warmup:"15kg×10 → 3分休憩",note:""},
+{name:"プルアップ",sets:3,target:"5〜8回",rest:3,minutes:12,kg:"",warmup:"",note:""},
+{name:"サポートダンベルロウ",sets:2,target:"12〜15回",rest:3,minutes:8,kg:"",warmup:"",note:"胸をベンチで支えて引く"},
+{name:"ワイドスクワット",sets:2,target:"10〜12回",rest:3,minutes:12,kg:30,warmup:"15kg×10 → 3分休憩",note:""}]},
 B:{title:"B｜平日",minutes:60,ex:[
-{name:"バープッシュアップ",sets:3,target:"限界回数",rest:3,kg:"",warmup:"",note:""},
-{name:"ダンベルショルダープレス",sets:1,target:"12〜15回",rest:3,kg:"",warmup:"",note:""},
-{name:"サイドレイズ",sets:2,target:"15〜20回",rest:1,kg:"",warmup:"",note:""},
-{name:"ルーマニアンデッドリフト",sets:2,target:"8〜10回",rest:3,kg:30,warmup:"15kg×10 → 3分休憩",note:""},
-{name:"プルアップ",sets:2,target:"5〜8回",rest:3,kg:"",warmup:"",note:""},
-{name:"サポートダンベルロウ",sets:2,target:"12〜15回",rest:3,kg:"",warmup:"",note:"胸をベンチで支えて引く"},
-{name:"ワイドスクワット",sets:2,target:"10〜12回",rest:3,kg:30,warmup:"15kg×10 → 3分休憩",note:""}]}};
+{name:"バープッシュアップ",sets:3,target:"限界回数",rest:3,minutes:12,kg:"",warmup:"",note:""},
+{name:"ダンベルショルダープレス",sets:1,target:"12〜15回",rest:3,minutes:4,kg:"",warmup:"",note:""},
+{name:"サイドレイズ",sets:2,target:"15〜20回",rest:1,minutes:4,kg:"",warmup:"",note:""},
+{name:"ルーマニアンデッドリフト",sets:2,target:"8〜10回",rest:3,minutes:12,kg:30,warmup:"15kg×10 → 3分休憩",note:""},
+{name:"プルアップ",sets:2,target:"5〜8回",rest:3,minutes:8,kg:"",warmup:"",note:""},
+{name:"サポートダンベルロウ",sets:2,target:"12〜15回",rest:3,minutes:8,kg:"",warmup:"",note:"胸をベンチで支えて引く"},
+{name:"ワイドスクワット",sets:2,target:"10〜12回",rest:3,minutes:12,kg:30,warmup:"15kg×10 → 3分休憩",note:""}]}};
 
 let current="A", editing=null, timerId=null, remaining=0;
 function clone(x){return JSON.parse(JSON.stringify(x))}
-function getPlans(){try{const x=localStorage.getItem("jun_training_plans");if(!x)return clone(defaults);const p=JSON.parse(x);if(!p?.A?.ex?.length||!p?.B?.ex?.length){const d=clone(defaults);localStorage.setItem("jun_training_plans",JSON.stringify(d));return d}return p}catch(e){return clone(defaults)}}
+
+function ensureMinutes(p){
+  const minsA=[22,8,8,16,12,8,12];
+  const minsB=[12,4,4,12,8,8,12];
+  if(p?.A?.ex) p.A.ex.forEach((e,i)=>{if(e.minutes===undefined||e.minutes===null||e.minutes==="") e.minutes=minsA[i]||0;});
+  if(p?.B?.ex) p.B.ex.forEach((e,i)=>{if(e.minutes===undefined||e.minutes===null||e.minutes==="") e.minutes=minsB[i]||0;});
+  return p;
+}
+
+function getPlans(){try{const x=localStorage.getItem("jun_training_plans");if(!x)return ensureMinutes(clone(defaults));const p=JSON.parse(x);if(!p?.A?.ex?.length||!p?.B?.ex?.length){const d=clone(defaults);localStorage.setItem("jun_training_plans",JSON.stringify(d));return d}p=ensureMinutes(p);localStorage.setItem("jun_training_plans",JSON.stringify(p));return p}catch(e){return ensureMinutes(clone(defaults))}}
 function putPlans(p){localStorage.setItem("jun_training_plans",JSON.stringify(p))}
 function todayISO(){return new Date().toISOString().slice(0,10)}
 function dkey(){return todayISO()+"_"+current}
@@ -184,17 +193,17 @@ function drawChart(){
 function previousSession(){const h=getHistory().filter(x=>x.plan===current).sort((a,b)=>b.date.localeCompare(a.date));return h[0]||null}
 function findPrevExercise(name){const p=previousSession();return p?p.exercises.find(x=>x.name===name)||null:null}
 function prevText(ex){const p=findPrevExercise(ex.name);if(!p)return "前回記録なし";return p.sets.map((x,i)=>`${i+1}:${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ")}
-function render(){const p=getPlans()[current],log=getLog();planTitle.textContent=p.title;planInfo.textContent=`${p.ex.length}種目・約${p.minutes}分`;list.innerHTML="";let total=0,done=0;
+function render(){const p=getPlans()[current],log=getLog();planTitle.textContent=p.title;const totalMinutes=p.ex.reduce((sum,e)=>sum+(parseInt(e.minutes)||0),0)||p.minutes;planInfo.textContent=`${p.ex.length}種目・約${totalMinutes}分`;list.innerHTML="";let total=0,done=0;
 p.ex.forEach((ex,ei)=>{let rows="";for(let si=0;si<ex.sets;si++){total++;const k=`e${ei}s${si}`,x=log[k]||{};if(x.done)done++;rows+=`<div class="setrow"><div class="setlabel">SET ${si+1}</div><input inputmode="decimal" placeholder="kg" value="${x.kg??ex.kg??''}" data-key="${k}" data-field="kg"><input inputmode="numeric" placeholder="回数" value="${x.reps??''}" data-key="${k}" data-field="reps"><button class="done ${x.done?'on':''}" onclick="toggleDone('${k}')">${x.done?'✓':'○'}</button></div>`}
-const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${ex.warmup?`<div class="warmup"><b>UP</b><br>${ex.warmup}</div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
+const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${ex.warmup?`<div class="warmup"><b>UP</b><br>${ex.warmup}</div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
 progress.textContent=`${done} / ${total}`;document.querySelectorAll("input[data-key]").forEach(el=>el.addEventListener("change",saveLog))}
 function saveLog(){const log=getLog();document.querySelectorAll("input[data-key]").forEach(el=>{const k=el.dataset.key,f=el.dataset.field;log[k]=log[k]||{};log[k][f]=el.value});putLog(log)}
 function toggleDone(k){saveLog();const l=getLog();l[k]=l[k]||{};l[k].done=!l[k].done;putLog(l);render()}
 function resetLog(){if(confirm("今日の記録をリセットしますか？")){localStorage.removeItem("jun_training_log_"+dkey());render()}}
 function switchPlan(p){saveLog();current=p;tabA.classList.toggle("active",p==="A");tabB.classList.toggle("active",p==="B");render()}
-function editExercise(i){editing=i;const ex=getPlans()[current].ex[i];modalTitle.textContent="種目を編集";fName.value=ex.name;fSets.value=ex.sets;fRest.value=ex.rest;fTarget.value=ex.target;fKg.value=ex.kg??"";fNote.value=ex.note??"";fWarmup.value=ex.warmup??"";deleteBtn.style.visibility="visible";openModal("editModal")}
-function newExercise(){editing=-1;modalTitle.textContent="種目を追加";["fName","fTarget","fKg","fNote","fWarmup"].forEach(id=>document.getElementById(id).value="");fSets.value=3;fRest.value=2;deleteBtn.style.visibility="hidden";openModal("editModal")}
-function saveExercise(){const ex={name:fName.value.trim()||"新しい種目",sets:Math.max(1,parseInt(fSets.value||1)),rest:Math.max(0,parseFloat(fRest.value||0)),target:fTarget.value.trim()||"回数自由",kg:fKg.value,note:fNote.value.trim(),warmup:fWarmup.value.trim()};const p=getPlans();if(editing===-1)p[current].ex.push(ex);else p[current].ex[editing]=ex;putPlans(p);closeModal("editModal");render()}
+function editExercise(i){editing=i;const ex=getPlans()[current].ex[i];modalTitle.textContent="種目を編集";fName.value=ex.name;fSets.value=ex.sets;fRest.value=ex.rest;fMinutes.value=ex.minutes??"";fTarget.value=ex.target;fKg.value=ex.kg??"";fNote.value=ex.note??"";fWarmup.value=ex.warmup??"";deleteBtn.style.visibility="visible";openModal("editModal")}
+function newExercise(){editing=-1;modalTitle.textContent="種目を追加";["fName","fTarget","fKg","fNote","fWarmup"].forEach(id=>document.getElementById(id).value="");fSets.value=3;fRest.value=2;fMinutes.value="";deleteBtn.style.visibility="hidden";openModal("editModal")}
+function saveExercise(){const ex={name:fName.value.trim()||"新しい種目",sets:Math.max(1,parseInt(fSets.value||1)),rest:Math.max(0,parseFloat(fRest.value||0)),minutes:Math.max(0,parseInt(fMinutes.value||0)),target:fTarget.value.trim()||"回数自由",kg:fKg.value,note:fNote.value.trim(),warmup:fWarmup.value.trim()};const p=getPlans();if(editing===-1)p[current].ex.push(ex);else p[current].ex[editing]=ex;putPlans(p);closeModal("editModal");render()}
 function deleteExercise(){if(editing<0)return;if(confirm("この種目を削除しますか？")){const p=getPlans();p[current].ex.splice(editing,1);putPlans(p);closeModal("editModal");render()}}
 function restoreDefaults(){if(confirm("A・Bメニューをデフォルトに戻しますか？")){putPlans(clone(defaults));render()}}
 function openModal(id){document.getElementById(id).classList.add("show")}function closeModal(id){document.getElementById(id).classList.remove("show")}function outsideClose(e,id){if(e.target.id===id)closeModal(id)}
