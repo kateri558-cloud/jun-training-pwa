@@ -64,7 +64,7 @@ input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;paddin
 <div id="reportModal" class="modal" onclick="outsideClose(event,'reportModal')"><div class="sheet">
 <h2>トレーナーへ報告</h2><div class="field"><label>今日の体感・気づき</label><input id="condition" placeholder="例：ベンチは余裕あり。RDLはハムに入った"></div>
 <div class="field"><label>トレーナーからのコメント</label><textarea id="trainerComment" placeholder="LINEでもらったコメントを貼って保存"></textarea></div>
-<div class="field"><label>LINE用報告文</label><textarea id="reportText"></textarea></div>
+<div class="field"><label>LINE用報告文</label><div class="small" style="margin-bottom:5px">回数を入力したセットだけ「重量×回数」で自動整形します</div><textarea id="reportText"></textarea></div>
 <div class="sheetactions"><button class="green" onclick="copyReport()">報告文をコピー</button><button class="primary" onclick="sendLineReport()">LINEで報告</button></div>
 <button class="btn" style="width:100%;margin-top:8px" onclick="saveTrainerComment()">コメント保存</button><button class="btn" style="width:100%;margin-top:8px" onclick="closeModal('reportModal')">閉じる</button></div></div>
 
@@ -203,7 +203,54 @@ function tick(){timerText.textContent=`${String(Math.floor(remaining/60)).padSta
 function buildSession(){saveLog();const p=getPlans()[current],log=getLog();return{date:todayISO(),plan:current,title:p.title,exercises:p.ex.map((ex,ei)=>({name:ex.name,sets:Array.from({length:ex.sets},(_,si)=>log[`e${ei}s${si}`]||{})})),condition:"",trainerComment:""}}
 function finishWorkout(){const s=buildSession(),h=getHistory(),idx=h.findIndex(x=>x.date===s.date&&x.plan===s.plan);if(idx>=0){s.condition=h[idx].condition||"";s.trainerComment=h[idx].trainerComment||"";h[idx]=s}else h.push(s);putHistory(h);alert("今日のトレーニングを保存しました");render()}
 function getTodayHistory(){return getHistory().find(x=>x.date===todayISO()&&x.plan===current)||null}
-function makeReport(){saveLog();const p=getPlans()[current],log=getLog();let out=`【${fmtDate()} ${p.title} トレーニング報告】\n`;p.ex.forEach((ex,ei)=>{let sets=[];for(let si=0;si<ex.sets;si++){const x=log[`e${ei}s${si}`]||{};if(x.kg||x.reps||x.done)sets.push(`${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps+"回":""}`)}if(sets.length)out+=`\n${ei+1}. ${ex.name}\n${sets.join(" / ")}`});if(condition.value.trim())out+=`\n\n【体感・気づき】\n${condition.value.trim()}`;return out+`\n\nよろしくお願いします。`}
+function makeReport(){
+  saveLog();
+  const p=getPlans()[current], log=getLog();
+  let out=`【${fmtDate()} ${p.title} トレーニング報告】
+`;
+
+  let recordedCount=0;
+  p.ex.forEach((ex,ei)=>{
+    const sets=[];
+    for(let si=0;si<ex.sets;si++){
+      const x=log[`e${ei}s${si}`]||{};
+      const kg=(x.kg!==undefined && x.kg!=="") ? String(x.kg).trim() : "";
+      const reps=(x.reps!==undefined && x.reps!=="") ? String(x.reps).trim() : "";
+
+      // 回数入力があるセットのみ報告対象。
+      // 自重種目はkgが空でも「自重×○回」と表示。
+      if(reps){
+        sets.push(`${kg ? kg+"kg" : "自重"}×${reps}回`);
+      }
+    }
+
+    if(sets.length){
+      recordedCount++;
+      out+=`
+${recordedCount}. ${ex.name}
+${sets.join(" / ")}
+`;
+    }
+  });
+
+  if(!recordedCount){
+    out+=`
+※まだ回数の入力がありません。
+`;
+  }
+
+  const c=condition.value.trim();
+  if(c){
+    out+=`
+【今日の体感・気づき】
+${c}
+`;
+  }
+
+  out+=`
+よろしくお願いします。`;
+  return out;
+}
 function openReport(){const th=getTodayHistory();condition.value=th?.condition||"";trainerComment.value=th?.trainerComment||"";reportText.value=makeReport();condition.oninput=()=>reportText.value=makeReport();openModal("reportModal")}
 async function copyReport(){try{await navigator.clipboard.writeText(reportText.value);alert("コピーしました")}catch(e){reportText.select();document.execCommand("copy");alert("コピーしました")}}
 
