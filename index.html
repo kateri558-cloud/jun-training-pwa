@@ -104,6 +104,25 @@ B:{title:"B｜平日",minutes:60,ex:[
 let current="A", editing=null, timerId=null, remaining=0;
 function clone(x){return JSON.parse(JSON.stringify(x))}
 
+function tokyoDateParts(){
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Asia/Tokyo",
+    year:"numeric",month:"2-digit",day:"2-digit"
+  }).formatToParts(new Date());
+  const obj={};
+  parts.forEach(p=>{ if(p.type!=="literal") obj[p.type]=p.value; });
+  return {year:obj.year,month:obj.month,day:obj.day};
+}
+function tokyoISODate(){
+  const d=tokyoDateParts();
+  return `${d.year}-${d.month}-${d.day}`;
+}
+function tokyoMD(){
+  const d=tokyoDateParts();
+  return `${parseInt(d.month,10)}/${parseInt(d.day,10)}`;
+}
+
+
 function ensureMinutes(p){
   const minsA=[22,8,8,16,12,8,12];
   const minsB=[12,4,4,12,8,8,12];
@@ -114,7 +133,7 @@ function ensureMinutes(p){
 
 function getPlans(){try{const x=localStorage.getItem("jun_training_plans");if(!x)return ensureMinutes(clone(defaults));const p=JSON.parse(x);if(!p?.A?.ex?.length||!p?.B?.ex?.length){const d=clone(defaults);localStorage.setItem("jun_training_plans",JSON.stringify(d));return d}p=ensureMinutes(p);localStorage.setItem("jun_training_plans",JSON.stringify(p));return p}catch(e){return ensureMinutes(clone(defaults))}}
 function putPlans(p){localStorage.setItem("jun_training_plans",JSON.stringify(p))}
-function todayISO(){return new Date().toISOString().slice(0,10)}
+function todayISO(){return tokyoISODate()}
 function dkey(){return todayISO()+"_"+current}
 function getLog(){try{return JSON.parse(localStorage.getItem("jun_training_log_"+dkey())||"{}")}catch(e){return{}}}
 function putLog(x){localStorage.setItem("jun_training_log_"+dkey(),JSON.stringify(x))}
