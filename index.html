@@ -191,6 +191,43 @@ function drawChart(){
 }
 
 
+function roundTo2_5(v){
+  return Math.max(0, Math.round(v/2.5)*2.5);
+}
+function getMainKg(ex,ei,log){
+  const first=log[`e${ei}s0`]||{};
+  const inputKg=parseFloat(first.kg);
+  if(!isNaN(inputKg) && inputKg>0) return inputKg;
+  const defaultKg=parseFloat(ex.kg);
+  return (!isNaN(defaultKg) && defaultKg>0) ? defaultKg : 0;
+}
+function autoWarmupText(ex,ei,log){
+  const main=getMainKg(ex,ei,log);
+  if(!main) return ex.warmup||"";
+
+  const name=ex.name||"";
+
+  // 15°ベンチ：35kg → 20kg×10 → 25kg×5 → 30kg×2
+  if(name.includes("15°") && name.includes("ベンチ")){
+    let w1=roundTo2_5(main*0.60);
+    let w2=roundTo2_5(main*0.70);
+    let w3=roundTo2_5(main*0.85);
+
+    if(w2<=w1) w2=w1+2.5;
+    if(w3<=w2) w3=w2+2.5;
+    if(w3>=main) w3=Math.max(0, main-2.5);
+
+    return `${w1}kg×10 → ${w2}kg×5 → ${w3}kg×2（休憩なし）→ 3分休憩`;
+  }
+
+  // RDL / ワイドスクワット：メイン重量の半分 ×10
+  if(name.includes("ルーマニアンデッドリフト") || name.includes("ワイドスクワット")){
+    const w=roundTo2_5(main*0.5);
+    return `${w}kg×10 → 3分休憩`;
+  }
+
+  return ex.warmup||"";
+}
 function refreshWarmupForExercise(ei){
   const p=getPlans()[current], log=getLog();
   const ex=p.ex[ei];
@@ -205,7 +242,7 @@ function findPrevExercise(name){const p=previousSession();return p?p.exercises.f
 function prevText(ex){const p=findPrevExercise(ex.name);if(!p)return "前回記録なし";return p.sets.map((x,i)=>`${i+1}:${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ")}
 function render(){const p=getPlans()[current],log=getLog();planTitle.textContent=p.title;const totalMinutes=p.ex.reduce((sum,e)=>sum+(parseInt(e.minutes)||0),0)||p.minutes;planInfo.textContent=`${p.ex.length}種目・約${totalMinutes}分`;list.innerHTML="";let total=0,done=0;
 p.ex.forEach((ex,ei)=>{let rows="";for(let si=0;si<ex.sets;si++){total++;const k=`e${ei}s${si}`,x=log[k]||{};if(x.done)done++;rows+=`<div class="setrow"><div class="setlabel">SET ${si+1}</div><input inputmode="decimal" placeholder="kg" value="${x.kg??ex.kg??''}" data-key="${k}" data-field="kg"><input inputmode="numeric" placeholder="回数" value="${x.reps??''}" data-key="${k}" data-field="reps"><button class="done ${x.done?'on':''}" onclick="toggleDone('${k}')">${x.done?'✓':'○'}</button></div>`}
-const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${ex.warmup?`<div class="warmup"><b>UP</b><br>${ex.warmup}</div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
+const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${autoWarmupText(ex,ei,log)?`<div class="warmup" id="warmup-${ei}"><b>UP</b><br><span>${autoWarmupText(ex,ei,log)}</span></div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
 progress.textContent=`${done} / ${total}`;document.querySelectorAll("input[data-key]").forEach(el=>el.addEventListener("change",saveLog))}
 function saveLog(){const log=getLog();document.querySelectorAll("input[data-key]").forEach(el=>{const k=el.dataset.key,f=el.dataset.field;log[k]=log[k]||{};log[k][f]=el.value});putLog(log)}
 function toggleDone(k){saveLog();const l=getLog();l[k]=l[k]||{};l[k].done=!l[k].done;putLog(l);render()}
@@ -282,26 +319,17 @@ function saveTrainerComment(){const s=buildSession(),h=getHistory();s.condition=
 function openHistory(){const h=getHistory().sort((a,b)=>b.date.localeCompare(a.date));historyList.innerHTML="";if(!h.length)historyList.innerHTML='<div class="note">まだ履歴がありません。</div>';h.forEach(s=>{const d=document.createElement("div");d.className="histitem";const body=s.exercises.map(e=>{const v=(e.sets||[]).filter(x=>x.kg||x.reps).map(x=>`${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ");return v?`<div><b>${e.name}</b>：${v}</div>`:""}).join("");d.innerHTML=`<div class="histtitle"><span>${fmtDate(s.date)} ${s.title}</span></div><div class="histbody">${body||"記録なし"}${s.condition?`<div><b>体感：</b>${s.condition}</div>`:""}${s.trainerComment?`<div><b>トレーナー：</b>${s.trainerComment}</div>`:""}</div>`;historyList.appendChild(d)});openModal("historyModal")}
 if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"))}
 
-if(!window.__junWarmupListener){
-  window.__junWarmupListener=true;
-  document.addEventListener("input",e=>{
-    const el=e.target;
-    if(!(el instanceof HTMLInputElement) || !el.matches("input[data-key]")) return;
+if(!window.__junWarmupAutoListener){
+  window.__junWarmupAutoListener=true;
+  const updateWarmupFromInput=(el)=>{
+    if(!(el instanceof HTMLInputElement) || !el.matches('input[data-key]')) return;
     saveLog();
-    if(el.dataset.field==="kg"){
-      const m=(el.dataset.key||"").match(/^e(\d+)s0$/);
-      if(m) refreshWarmupForExercise(parseInt(m[1],10));
-    }
-  });
-  document.addEventListener("change",e=>{
-    const el=e.target;
-    if(!(el instanceof HTMLInputElement) || !el.matches("input[data-key]")) return;
-    saveLog();
-    if(el.dataset.field==="kg"){
-      const m=(el.dataset.key||"").match(/^e(\d+)s0$/);
-      if(m) refreshWarmupForExercise(parseInt(m[1],10));
-    }
-  });
+    if(el.dataset.field!=="kg") return;
+    const m=(el.dataset.key||"").match(/^e(\d+)s0$/);
+    if(m) refreshWarmupForExercise(parseInt(m[1],10));
+  };
+  document.addEventListener("input",e=>updateWarmupFromInput(e.target));
+  document.addEventListener("change",e=>updateWarmupFromInput(e.target));
 }
 
 render();
