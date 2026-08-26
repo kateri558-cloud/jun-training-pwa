@@ -273,7 +273,34 @@ function saveExercise(){const ex={name:fName.value.trim()||"新しい種目",set
 function deleteExercise(){if(editing<0)return;if(confirm("この種目を削除しますか？")){const p=getPlans();p[current].ex.splice(editing,1);putPlans(p);closeModal("editModal");render()}}
 function restoreDefaults(){if(confirm("A・Bメニューをデフォルトに戻しますか？")){putPlans(clone(defaults));render()}}
 function openModal(id){document.getElementById(id).classList.add("show")}function closeModal(id){document.getElementById(id).classList.remove("show")}function outsideClose(e,id){if(e.target.id===id)closeModal(id)}
-function startTimer(sec){stopTimer(false);remaining=sec;timerBox.classList.add("show");tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){stopTimer();alert("休憩終了！")}},1000)}
+let audioCtx=null;
+function ensureAudioCtx(){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return null;
+    if(!audioCtx) audioCtx=new Ctx();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    return audioCtx;
+  }catch(e){return null}
+}
+function playTimerEndBeep(){
+  try{
+    const ctx=ensureAudioCtx();
+    if(!ctx) return;
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.type="sine";osc.frequency.value=880;
+    gain.gain.setValueAtTime(0.0001,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.15,ctx.currentTime+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.35);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();osc.stop(ctx.currentTime+0.36);
+  }catch(e){}
+}
+function vibrateTimerEnd(){
+  try{if(navigator.vibrate) navigator.vibrate([120,60,120])}catch(e){}
+}
+function notifyTimerEnd(){playTimerEndBeep();vibrateTimerEnd()}
+function startTimer(sec){stopTimer(false);remaining=sec;timerBox.classList.add("show");ensureAudioCtx();tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){stopTimer();notifyTimerEnd();alert("休憩終了！")}},1000)}
 function tick(){timerText.textContent=`${String(Math.floor(remaining/60)).padStart(2,"0")}:${String(remaining%60).padStart(2,"0")}`}function stopTimer(hide=true){if(timerId)clearInterval(timerId);timerId=null;if(hide)timerBox.classList.remove("show")}
 function buildSession(){saveLog();const p=getPlans()[current],log=getLog();return{date:todayISO(),plan:current,title:p.title,exercises:p.ex.map((ex,ei)=>({name:ex.name,sets:Array.from({length:ex.sets},(_,si)=>log[`e${ei}s${si}`]||{})})),condition:"",trainerComment:""}}
 function finishWorkout(){const s=buildSession(),h=getHistory(),idx=h.findIndex(x=>x.date===s.date&&x.plan===s.plan);if(idx>=0){s.condition=h[idx].condition||"";s.trainerComment=h[idx].trainerComment||"";h[idx]=s}else h.push(s);putHistory(h);alert("今日のトレーニングを保存しました");render()}
