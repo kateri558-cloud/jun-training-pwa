@@ -335,7 +335,19 @@ function highlightNextSet(key,plan){
     if(row) row.scrollIntoView({behavior:"smooth",block:"center"});
   }
 }
-function startTimer(sec,nextKey,nextPlan){stopTimer(false);remaining=sec;timerBox.classList.add("show");ensureAudioCtx();tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){stopTimer();notifyTimerEnd();if(nextKey) highlightNextSet(nextKey,nextPlan);alert("休憩終了！")}},1000)}
+function startTimer(sec,nextKey,nextPlan){stopTimer(false);remaining=sec;timerBox.classList.add("show");ensureAudioCtx();tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){
+  stopTimer();
+  // 音・バイブのOSへのディスパッチを最優先で確実に行うため、
+  // 重い次セット強調のrender()とブロッキングなalert()は
+  // 一度メインスレッドを解放してから実行する（setTimeoutで遅延）。
+  // こうしないと、render()の同期処理とalert()のブロッキングにより
+  // 実機（Android Chrome）で音・バイブのリクエストが握りつぶされることがある。
+  notifyTimerEnd();
+  setTimeout(()=>{
+    try{ if(nextKey) highlightNextSet(nextKey,nextPlan); }catch(e){}
+    alert("休憩終了！");
+  },0);
+}},1000)}
 function tick(){timerText.textContent=`${String(Math.floor(remaining/60)).padStart(2,"0")}:${String(remaining%60).padStart(2,"0")}`}function stopTimer(hide=true){if(timerId)clearInterval(timerId);timerId=null;if(hide)timerBox.classList.remove("show")}
 function buildSession(){saveLog();const p=getPlans()[current],log=getLog();return{date:todayISO(),plan:current,title:p.title,exercises:p.ex.map((ex,ei)=>({name:ex.name,sets:Array.from({length:ex.sets},(_,si)=>log[`e${ei}s${si}`]||{})})),condition:"",trainerComment:""}}
 function finishWorkout(){const s=buildSession(),h=getHistory(),idx=h.findIndex(x=>x.date===s.date&&x.plan===s.plan);if(idx>=0){s.condition=h[idx].condition||"";s.trainerComment=h[idx].trainerComment||"";h[idx]=s}else h.push(s);putHistory(h);alert("今日のトレーニングを保存しました");render()}
