@@ -336,7 +336,16 @@ function sendLineReport(){
 async function shareReport(){if(navigator.share){try{await navigator.share({title:"トレーニング報告",text:reportText.value})}catch(e){}}else await copyReport()}
 function saveTrainerComment(){const s=buildSession(),h=getHistory();s.condition=condition.value.trim();s.trainerComment=trainerComment.value.trim();const idx=h.findIndex(x=>x.date===s.date&&x.plan===s.plan);if(idx>=0)h[idx]=s;else h.push(s);putHistory(h);alert("保存しました")}
 function openHistory(){const h=getHistory().sort((a,b)=>b.date.localeCompare(a.date));historyList.innerHTML="";if(!h.length)historyList.innerHTML='<div class="note">まだ履歴がありません。</div>';h.forEach(s=>{const d=document.createElement("div");d.className="histitem";const body=s.exercises.map(e=>{const v=(e.sets||[]).filter(x=>x.kg||x.reps).map(x=>`${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ");return v?`<div><b>${e.name}</b>：${v}</div>`:""}).join("");d.innerHTML=`<div class="histtitle"><span>${fmtDate(s.date)} ${s.title}</span></div><div class="histbody">${body||"記録なし"}${s.condition?`<div><b>体感：</b>${s.condition}</div>`:""}${s.trainerComment?`<div><b>トレーナー：</b>${s.trainerComment}</div>`:""}</div>`;historyList.appendChild(d)});openModal("historyModal")}
-if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"))}
+if("serviceWorker" in navigator){
+  const hadController=!!navigator.serviceWorker.controller;
+  let swReloaded=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{
+    if(swReloaded || !hadController) return;
+    swReloaded=true;
+    window.location.reload();
+  });
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js"));
+}
 
 if(!window.__junWarmupAutoListener){
   window.__junWarmupAutoListener=true;
