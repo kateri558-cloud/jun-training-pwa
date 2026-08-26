@@ -1,4 +1,4 @@
-const CACHE='jun-training-v5-8';
+const CACHE='jun-training-v5-9';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install', event => {

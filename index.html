@@ -18,7 +18,7 @@ h1{font-size:25px;margin:0}.small{font-size:12px;color:var(--muted)}
 .head{display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:start}.num{width:30px;height:30px;border-radius:9px;background:#111;color:white;display:grid;place-items:center;font-size:13px;font-weight:800}
 .name{font-size:17px;font-weight:850;line-height:1.3}.meta{font-size:12px;color:var(--muted);margin-top:4px}.iconbtn{border:0;background:var(--soft);border-radius:10px;padding:8px 10px;font-weight:800}
 .warmup,.prev{margin-top:10px;padding:9px 10px;background:#fafafa;border-radius:11px;border:1px solid var(--line);font-size:12px;line-height:1.5}.up{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--good);font-weight:900;font-size:11px}
-.sets{display:grid;gap:7px;margin-top:11px}.setrow{display:grid;grid-template-columns:42px 1fr 1fr 36px;gap:7px;align-items:center}.setlabel{font-size:11px;font-weight:800;color:var(--muted)}
+.sets{display:grid;gap:7px;margin-top:11px}.setrow{display:grid;grid-template-columns:42px 1fr 1fr 36px;gap:7px;align-items:center;border-radius:10px;border:2px solid transparent;padding:2px}.setrow.next-highlight{background:#fff6e0;border-color:#f0a020}.setlabel{font-size:11px;font-weight:800;color:var(--muted)}
 input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:10px 9px;background:#fff;font-size:15px;outline:none}textarea{min-height:120px;resize:vertical}
 .done{height:35px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:18px}.done.on{background:#111;color:#fff}
 .actions{display:flex;gap:8px;margin-top:11px}.btn{border:0;border-radius:11px;padding:10px 12px;background:var(--soft);font-weight:800}.btn.dark{background:#111;color:#fff}
@@ -102,6 +102,7 @@ B:{title:"B｜平日",minutes:60,ex:[
 {name:"ワイドスクワット",sets:2,target:"10〜12回",rest:3,minutes:12,kg:30,warmup:"15kg×10 → 3分休憩",note:""}]}};
 
 let current="A", editing=null, timerId=null, remaining=0;
+let highlightedSetKey=null, highlightedPlan=null;
 function clone(x){return JSON.parse(JSON.stringify(x))}
 
 function tokyoDateParts(){
@@ -260,12 +261,12 @@ function previousSession(){const h=getHistory().filter(x=>x.plan===current).sort
 function findPrevExercise(name){const p=previousSession();return p?p.exercises.find(x=>x.name===name)||null:null}
 function prevText(ex){const p=findPrevExercise(ex.name);if(!p)return "前回記録なし";return p.sets.map((x,i)=>`${i+1}:${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ")}
 function render(){const p=getPlans()[current],log=getLog();planTitle.textContent=p.title;const totalMinutes=p.ex.reduce((sum,e)=>sum+(parseInt(e.minutes)||0),0)||p.minutes;planInfo.textContent=`${p.ex.length}種目・約${totalMinutes}分`;list.innerHTML="";let total=0,done=0;
-p.ex.forEach((ex,ei)=>{let rows="";for(let si=0;si<ex.sets;si++){total++;const k=`e${ei}s${si}`,x=log[k]||{};if(x.done)done++;rows+=`<div class="setrow"><div class="setlabel">SET ${si+1}</div><input inputmode="decimal" placeholder="kg" value="${x.kg??ex.kg??''}" data-key="${k}" data-field="kg"><input inputmode="numeric" placeholder="回数" value="${x.reps??''}" data-key="${k}" data-field="reps"><button class="done ${x.done?'on':''}" onclick="toggleDone('${k}')">${x.done?'✓':'○'}</button></div>`}
+p.ex.forEach((ex,ei)=>{let rows="";for(let si=0;si<ex.sets;si++){total++;const k=`e${ei}s${si}`,x=log[k]||{};if(x.done)done++;const isNext=current===highlightedPlan && k===highlightedSetKey;rows+=`<div class="setrow${isNext?' next-highlight':''}" data-setrow="${k}"><div class="setlabel">SET ${si+1}</div><input inputmode="decimal" placeholder="kg" value="${x.kg??ex.kg??''}" data-key="${k}" data-field="kg"><input inputmode="numeric" placeholder="回数" value="${x.reps??''}" data-key="${k}" data-field="reps"><button class="done ${x.done?'on':''}" onclick="toggleDone('${k}')">${x.done?'✓':'○'}</button></div>`}
 const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${autoWarmupText(ex,ei,log)?`<div class="warmup" id="warmup-${ei}"><b>UP</b><br><span>${autoWarmupText(ex,ei,log)}</span></div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
 progress.textContent=`${done} / ${total}`;document.querySelectorAll("input[data-key]").forEach(el=>el.addEventListener("change",saveLog))}
 function saveLog(){const log=getLog();document.querySelectorAll("input[data-key]").forEach(el=>{const k=el.dataset.key,f=el.dataset.field;log[k]=log[k]||{};log[k][f]=el.value});putLog(log)}
-function toggleDone(k){saveLog();const l=getLog();l[k]=l[k]||{};l[k].done=!l[k].done;putLog(l);render();if(l[k].done){const m=(k||"").match(/^e(\d+)s(\d+)$/);if(m){const ei=parseInt(m[1],10),si=parseInt(m[2],10);const ex=getPlans()[current].ex[ei];if(ex && si<ex.sets-1) startTimer(Math.round(ex.rest*60))}}}
-function resetLog(){if(confirm("今日の記録をリセットしますか？")){localStorage.removeItem("jun_training_log_"+dkey());render()}}
+function toggleDone(k){saveLog();const l=getLog();l[k]=l[k]||{};l[k].done=!l[k].done;putLog(l);if(k===highlightedSetKey && current===highlightedPlan) clearNextHighlight();render();if(l[k].done){const m=(k||"").match(/^e(\d+)s(\d+)$/);if(m){const ei=parseInt(m[1],10),si=parseInt(m[2],10);const ex=getPlans()[current].ex[ei];if(ex && si<ex.sets-1) startTimer(Math.round(ex.rest*60),`e${ei}s${si+1}`,current)}}}
+function resetLog(){if(confirm("今日の記録をリセットしますか？")){localStorage.removeItem("jun_training_log_"+dkey());if(current===highlightedPlan) clearNextHighlight();render()}}
 function switchPlan(p){saveLog();current=p;tabA.classList.toggle("active",p==="A");tabB.classList.toggle("active",p==="B");render()}
 function editExercise(i){editing=i;const ex=getPlans()[current].ex[i];modalTitle.textContent="種目を編集";fName.value=ex.name;fSets.value=ex.sets;fRest.value=ex.rest;fMinutes.value=ex.minutes??"";fTarget.value=ex.target;fKg.value=ex.kg??"";fNote.value=ex.note??"";fWarmup.value=ex.warmup??"";deleteBtn.style.visibility="visible";openModal("editModal")}
 function newExercise(){editing=-1;modalTitle.textContent="種目を追加";["fName","fTarget","fKg","fNote","fWarmup"].forEach(id=>document.getElementById(id).value="");fSets.value=3;fRest.value=2;fMinutes.value="";deleteBtn.style.visibility="hidden";openModal("editModal")}
@@ -317,7 +318,24 @@ function vibrateTimerEnd(){
   try{if(navigator.vibrate) navigator.vibrate([200,100,200])}catch(e){}
 }
 function notifyTimerEnd(){playTimerEndBeep();vibrateTimerEnd()}
-function startTimer(sec){stopTimer(false);remaining=sec;timerBox.classList.add("show");ensureAudioCtx();tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){stopTimer();notifyTimerEnd();alert("休憩終了！")}},1000)}
+function clearNextHighlight(liveDomOnly){
+  if(!highlightedSetKey) return;
+  const key=highlightedSetKey,plan=highlightedPlan;
+  highlightedSetKey=null;highlightedPlan=null;
+  if(liveDomOnly && plan===current){
+    const row=document.querySelector(`.setrow[data-setrow="${key}"]`);
+    if(row) row.classList.remove("next-highlight");
+  }
+}
+function highlightNextSet(key,plan){
+  highlightedSetKey=key;highlightedPlan=plan;
+  render();
+  if(plan===current){
+    const row=document.querySelector(`.setrow[data-setrow="${key}"]`);
+    if(row) row.scrollIntoView({behavior:"smooth",block:"center"});
+  }
+}
+function startTimer(sec,nextKey,nextPlan){stopTimer(false);remaining=sec;timerBox.classList.add("show");ensureAudioCtx();tick();timerId=setInterval(()=>{remaining--;tick();if(remaining<=0){stopTimer();notifyTimerEnd();if(nextKey) highlightNextSet(nextKey,nextPlan);alert("休憩終了！")}},1000)}
 function tick(){timerText.textContent=`${String(Math.floor(remaining/60)).padStart(2,"0")}:${String(remaining%60).padStart(2,"0")}`}function stopTimer(hide=true){if(timerId)clearInterval(timerId);timerId=null;if(hide)timerBox.classList.remove("show")}
 function buildSession(){saveLog();const p=getPlans()[current],log=getLog();return{date:todayISO(),plan:current,title:p.title,exercises:p.ex.map((ex,ei)=>({name:ex.name,sets:Array.from({length:ex.sets},(_,si)=>log[`e${ei}s${si}`]||{})})),condition:"",trainerComment:""}}
 function finishWorkout(){const s=buildSession(),h=getHistory(),idx=h.findIndex(x=>x.date===s.date&&x.plan===s.plan);if(idx>=0){s.condition=h[idx].condition||"";s.trainerComment=h[idx].trainerComment||"";h[idx]=s}else h.push(s);putHistory(h);alert("今日のトレーニングを保存しました");render()}
@@ -400,7 +418,17 @@ if(!window.__junWarmupAutoListener){
     const m=(el.dataset.key||"").match(/^e(\d+)s0$/);
     if(m) refreshWarmupForExercise(parseInt(m[1],10));
   };
-  document.addEventListener("input",e=>updateWarmupFromInput(e.target));
+  // 強調解除は"input"イベント（実際のキー入力）のみで行う。
+  // "change"はrender()がフォーカス中の要素を破棄した際にも
+  // ブラウザがブラー扱いで同期発火することがあり、render()実行中に
+  // highlightedSetKeyを書き換えてしまう再入バグを避けるため。
+  document.addEventListener("input",e=>{
+    const el=e.target;
+    updateWarmupFromInput(el);
+    if(el instanceof HTMLInputElement && el.matches('input[data-key]') && el.dataset.key===highlightedSetKey && current===highlightedPlan){
+      clearNextHighlight(true);
+    }
+  });
   document.addEventListener("change",e=>updateWarmupFromInput(e.target));
 }
 
