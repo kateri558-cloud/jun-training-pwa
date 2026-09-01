@@ -396,15 +396,22 @@ function makeReport(){
       // 回数入力があるセットのみ報告対象。
       // 自重種目はkgが空でも「自重×○回」と表示。
       if(reps){
-        sets.push(`${kg ? kg+"kg" : "自重"}×${reps}回`);
+        const kgKey=kg ? (isNaN(parseFloat(kg))?kg:String(parseFloat(kg))) : "自重";
+        sets.push({kg, kgKey, reps});
       }
     }
 
     if(sets.length){
       recordedCount++;
+      // 全セット同じ重量なら「重量-回数,回数,...」の省略形にまとめる。
+      // セットごとに重量が違う場合は従来どおり各セットを個別表示する。
+      const sameWeight=sets.every(s=>s.kgKey===sets[0].kgKey);
+      const line=sameWeight
+        ? `${sets[0].kg?sets[0].kg:"自重"}-${sets.map(s=>s.reps).join(",")}`
+        : sets.map(s=>`${s.kg?s.kg+"kg":"自重"}×${s.reps}回`).join(" / ");
       out+=`
 ${recordedCount}. ${ex.name}
-${sets.join(" / ")}
+${line}
 `;
     }
   });
