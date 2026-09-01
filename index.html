@@ -133,7 +133,7 @@ function ensureMinutes(p){
   return p;
 }
 
-function getPlans(){try{const x=localStorage.getItem("jun_training_plans");if(!x)return ensureMinutes(clone(defaults));const p=JSON.parse(x);if(!p?.A?.ex?.length||!p?.B?.ex?.length){const d=clone(defaults);localStorage.setItem("jun_training_plans",JSON.stringify(d));return d}p=ensureMinutes(p);localStorage.setItem("jun_training_plans",JSON.stringify(p));return p}catch(e){return ensureMinutes(clone(defaults))}}
+function getPlans(){try{const x=localStorage.getItem("jun_training_plans");if(!x)return ensureMinutes(clone(defaults));let p=JSON.parse(x);if(!p?.A?.ex?.length||!p?.B?.ex?.length){const d=clone(defaults);localStorage.setItem("jun_training_plans",JSON.stringify(d));return d}p=ensureMinutes(p);localStorage.setItem("jun_training_plans",JSON.stringify(p));return p}catch(e){return ensureMinutes(clone(defaults))}}
 function putPlans(p){localStorage.setItem("jun_training_plans",JSON.stringify(p))}
 function todayISO(){return tokyoISODate()}
 function dkey(){return todayISO()+"_"+current}
@@ -146,31 +146,51 @@ document.getElementById("today").textContent=fmtDate();
 
 
 let chartExerciseName="", chartMode="kg";
-function parseTargetMax(target){
+function parseTargetRange(target){
   const nums=(target||"").match(/\d+/g);
-  return nums&&nums.length?Math.max(...nums.map(Number)):null;
+  if(!nums||!nums.length) return {min:null,max:null};
+  const ns=nums.map(Number);
+  return {min:Math.min(...ns),max:Math.max(...ns)};
+}
+function repRangeLabel(range){
+  return range.min===range.max?`${range.max}回`:`${range.min}〜${range.max}回`;
+}
+function prevSessionKg(name){
+  const p=findPrevExercise(name);
+  if(!p) return null;
+  const kgs=(p.sets||[]).map(x=>parseFloat(x.kg)||0).filter(k=>k>0);
+  return kgs.length?Math.max(...kgs):null;
 }
 function nextRecommendation(ex,ei,log){
   const sets=[];
   for(let si=0;si<ex.sets;si++){
     const x=log[`e${ei}s${si}`]||{};
-    sets.push({kg:parseFloat(x.kg)||0,reps:parseInt(x.reps)||0});
+    sets.push({kg:parseFloat(x.kg)||0,reps:parseInt(x.reps)||0,done:!!x.done});
   }
-  if(!sets.some(x=>x.kg||x.reps)) return "今日の記録を入れると次回おすすめを表示します。";
-  const usedKg=Math.max(...sets.map(x=>x.kg));
-  const maxRep=parseTargetMax(ex.target);
+  const allDone=sets.length>0 && sets.every(s=>s.done);
+  if(!allDone) return "判定待ち<br>すべてのセットを完了すると次回重量を判定します";
+
+  const usedKg=Math.max(...sets.map(s=>s.kg));
   if(!usedKg) return "自重種目：まず全セットで目標回数を安定して達成。";
-  const valid=sets.filter(x=>x.reps>0);
-  if(!valid.length||!maxRep) return `次回目安：${usedKg}kgを基準に調整。`;
-  const allHit=valid.length===ex.sets && valid.every(x=>x.reps>=maxRep);
-  if(!allHit) return `次回：${usedKg}kg継続。全セットで${maxRep}回できたら増量。`;
-  const todayOneRM=Math.max(0,...sets.map(x=>estimated1RM(x.kg,x.reps)));
-  const prevInfo=latestAndPrevOneRM(ex.name);
-  const prevOneRM=prevInfo?prevInfo.latest:null;
-  const declining=(todayOneRM>0 && prevOneRM!=null && (prevOneRM-todayOneRM)/prevOneRM>=0.02);
-  if(declining) return `次回：${usedKg}kg継続。推定1RMがやや低下しているため無理に増量しません。`;
-  const step=usedKg<20?1:2.5;
-  return `次回：${usedKg+step}kgへアップ候補`;
+
+  const range=parseTargetRange(ex.target);
+  if(!range.max) return `次回目安：${usedKg}kgを基準に調整。`;
+
+  const allHitMax=sets.every(s=>s.reps>=range.max);
+  if(allHitMax){
+    const step=usedKg<20?1:2.5;
+    const nextKg=usedKg+step;
+    return `🟢 重量アップOK<br>次回：${nextKg}kg×${repRangeLabel(range)}に挑戦<br>理由：目標上限${range.max}回を${ex.sets}set達成`;
+  }
+
+  const belowMin=range.min!=null && sets.some(s=>s.reps<range.min);
+  const prevKg=prevSessionKg(ex.name);
+  const wasWeightUp=(prevKg!=null && usedKg>prevKg);
+  if(belowMin && wasWeightUp){
+    return `🔴 前の重量へ戻す候補<br>次回：${prevKg}kg×${repRangeLabel(range)}<br>理由：新しい重量で目標下限${range.min}回に届いていません`;
+  }
+
+  return `🟡 同じ重量を継続<br>次回：${usedKg}kg×${repRangeLabel(range)}<br>理由：まだ目標上限に達していないセットがあります`;
 }
 function estimated1RM(kg,reps){
   return (kg>0 && reps>0) ? kg*(1+reps/30) : 0;
