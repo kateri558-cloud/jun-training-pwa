@@ -37,7 +37,7 @@ input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;paddin
 .chartwrap{width:100%;overflow:hidden;border:1px solid var(--line);border-radius:14px;padding:10px;background:#fff}
 .chartlegend{font-size:12px;color:var(--muted);margin:4px 0 10px}
 .chartempty{padding:28px 8px;text-align:center;color:var(--muted);font-size:13px}
-.charttabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.charttabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
 .charttabs button{border:0;border-radius:11px;padding:10px;font-weight:800;background:var(--soft)}
 .charttabs button.active{background:#111;color:#fff}
 </style>
@@ -76,6 +76,7 @@ input,textarea{width:100%;border:1px solid var(--line);border-radius:11px;paddin
 <div class="charttabs">
 <button id="chartKgBtn" class="active" onclick="setChartMode('kg')">重量</button>
 <button id="chartRepsBtn" onclick="setChartMode('reps')">回数</button>
+<button id="chart1rmBtn" onclick="setChartMode('1rm')">推定1RM</button>
 </div>
 <div class="chartlegend" id="chartLegend"></div>
 <div class="chartwrap" id="chartBox"></div>
@@ -162,11 +163,17 @@ function nextRecommendation(ex,ei,log){
   const valid=sets.filter(x=>x.reps>0);
   if(!valid.length||!maxRep) return `次回目安：${usedKg}kgを基準に調整。`;
   const allHit=valid.length===ex.sets && valid.every(x=>x.reps>=maxRep);
-  if(allHit){
-    const step=usedKg<20?1:2.5;
-    return `次回おすすめ：${usedKg+step}kg（全セットで上限回数達成）`;
-  }
-  return `次回おすすめ：${usedKg}kg継続。全セットで${maxRep}回できたら増量。`;
+  if(!allHit) return `次回：${usedKg}kg継続。全セットで${maxRep}回できたら増量。`;
+  const todayOneRM=Math.max(0,...sets.map(x=>estimated1RM(x.kg,x.reps)));
+  const prevInfo=latestAndPrevOneRM(ex.name);
+  const prevOneRM=prevInfo?prevInfo.latest:null;
+  const declining=(todayOneRM>0 && prevOneRM!=null && (prevOneRM-todayOneRM)>0.5);
+  if(declining) return `次回：${usedKg}kg継続。推定1RMがやや低下しているため無理に増量しません。`;
+  const step=usedKg<20?1:2.5;
+  return `次回：${usedKg+step}kgへアップ候補`;
+}
+function estimated1RM(kg,reps){
+  return (kg>0 && reps>0) ? kg*(1+reps/30) : 0;
 }
 function exerciseHistory(name){
   return getHistory().filter(s=>Array.isArray(s.exercises))
@@ -175,38 +182,58 @@ function exerciseHistory(name){
       const e=s.exercises.find(e=>e.name===name);
       if(!e) return null;
       const vals=(e.sets||[]).map(x=>({kg:parseFloat(x.kg)||0,reps:parseInt(x.reps)||0}));
-      return {date:s.date,kg:Math.max(0,...vals.map(x=>x.kg)),reps:Math.max(0,...vals.map(x=>x.reps))};
+      const oneRM=Math.max(0,...vals.map(x=>estimated1RM(x.kg,x.reps)));
+      return {date:s.date,kg:Math.max(0,...vals.map(x=>x.kg)),reps:Math.max(0,...vals.map(x=>x.reps)),oneRM};
     }).filter(Boolean);
 }
+function latestAndPrevOneRM(name){
+  const hist=exerciseHistory(name).filter(d=>d.oneRM>0);
+  if(!hist.length) return null;
+  const latest=hist[hist.length-1];
+  const prev=hist.length>1?hist[hist.length-2]:null;
+  return {latest:latest.oneRM, prev:prev?prev.oneRM:null};
+}
+function oneRMSummaryText(ex){
+  const r=latestAndPrevOneRM(ex.name);
+  if(!r) return "";
+  const latestText=r.latest.toFixed(1)+"kg";
+  if(r.prev==null) return `推定1RM：${latestText}（Epley式）`;
+  const diff=r.latest-r.prev;
+  const diffText=(diff>=0?"+":"")+diff.toFixed(1)+"kg";
+  return `推定1RM：${r.prev.toFixed(1)}kg → ${latestText}（${diffText}）`;
+}
+function chartValueOf(d){return chartMode==="kg"?d.kg:chartMode==="reps"?d.reps:d.oneRM}
 function openExerciseChart(name){
   chartExerciseName=name; chartMode="kg"; chartTitle.textContent=name+"｜推移";
-  chartKgBtn.classList.add("active"); chartRepsBtn.classList.remove("active");
+  chartKgBtn.classList.add("active"); chartRepsBtn.classList.remove("active"); chart1rmBtn.classList.remove("active");
   drawChart(); openModal("chartModal");
 }
 function setChartMode(mode){
   chartMode=mode;
   chartKgBtn.classList.toggle("active",mode==="kg");
   chartRepsBtn.classList.toggle("active",mode==="reps");
+  chart1rmBtn.classList.toggle("active",mode==="1rm");
   drawChart();
 }
 function drawChart(){
-  const rows=exerciseHistory(chartExerciseName).filter(d=>(chartMode==="kg"?d.kg:d.reps)>0);
+  const rows=exerciseHistory(chartExerciseName).filter(d=>chartValueOf(d)>0);
   chartBox.innerHTML="";
-  chartLegend.textContent=chartMode==="kg"?"各日の最高使用重量（kg）":"各日の最高回数";
+  chartLegend.textContent=chartMode==="kg"?"各日の最高使用重量（kg）":chartMode==="reps"?"各日の最高回数":"各日の推定1RM（Epley式・kg）";
   if(!rows.length){chartBox.innerHTML='<div class="chartempty">履歴がたまるとここに推移グラフが出ます。</div>';return;}
   const w=620,h=260,L=45,R=18,T=18,B=48;
-  const vals=rows.map(d=>chartMode==="kg"?d.kg:d.reps);
+  const decimals=chartMode==="reps"?0:1;
+  const vals=rows.map(chartValueOf);
   const lo=Math.max(0,Math.floor(Math.min(...vals)*0.9));
   const hi=Math.max(lo+1,Math.ceil(Math.max(...vals)*1.1));
   const x=i=>rows.length===1?L+(w-L-R)/2:L+i*(w-L-R)/(rows.length-1);
   const y=v=>T+(hi-v)*(h-T-B)/(hi-lo);
-  const pts=rows.map((d,i)=>`${x(i)},${y(chartMode==="kg"?d.kg:d.reps)}`).join(" ");
+  const pts=rows.map((d,i)=>`${x(i)},${y(chartValueOf(d))}`).join(" ");
   const grid=[0,.25,.5,.75,1].map(t=>{
-    const yy=T+t*(h-T-B), val=(hi-t*(hi-lo)).toFixed(chartMode==="kg"?1:0);
+    const yy=T+t*(h-T-B), val=(hi-t*(hi-lo)).toFixed(decimals);
     return `<line x1="${L}" y1="${yy}" x2="${w-R}" y2="${yy}" stroke="#e7e7e7"/><text x="${L-7}" y="${yy+4}" text-anchor="end" font-size="11" fill="#777">${val}</text>`;
   }).join("");
   const labels=rows.map((d,i)=>`<text x="${x(i)}" y="${h-18}" text-anchor="middle" font-size="10" fill="#777">${d.date.slice(5).replace("-","/")}</text>`).join("");
-  const dots=rows.map((d,i)=>{const v=chartMode==="kg"?d.kg:d.reps;return `<circle cx="${x(i)}" cy="${y(v)}" r="5" fill="#111"/><text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="11" font-weight="700">${v}</text>`}).join("");
+  const dots=rows.map((d,i)=>{const v=chartValueOf(d),label=chartMode==="1rm"?v.toFixed(1):v;return `<circle cx="${x(i)}" cy="${y(v)}" r="5" fill="#111"/><text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="11" font-weight="700">${label}</text>`}).join("");
   chartBox.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="100%"><polyline fill="none" stroke="#111" stroke-width="3" points="${pts}"/>${grid}${dots}${labels}</svg>`;
 }
 
@@ -262,7 +289,7 @@ function findPrevExercise(name){const p=previousSession();return p?p.exercises.f
 function prevText(ex){const p=findPrevExercise(ex.name);if(!p)return "前回記録なし";return p.sets.map((x,i)=>`${i+1}:${x.kg?x.kg+"kg":"自重"}${x.reps?"×"+x.reps:""}`).join(" / ")}
 function render(){const p=getPlans()[current],log=getLog();planTitle.textContent=p.title;const totalMinutes=p.ex.reduce((sum,e)=>sum+(parseInt(e.minutes)||0),0)||p.minutes;planInfo.textContent=`${p.ex.length}種目・約${totalMinutes}分`;list.innerHTML="";let total=0,done=0;
 p.ex.forEach((ex,ei)=>{let rows="";for(let si=0;si<ex.sets;si++){total++;const k=`e${ei}s${si}`,x=log[k]||{};if(x.done)done++;const isNext=current===highlightedPlan && k===highlightedSetKey;rows+=`<div class="setrow${isNext?' next-highlight':''}" data-setrow="${k}"><div class="setlabel">SET ${si+1}</div><input inputmode="decimal" placeholder="kg" value="${x.kg??ex.kg??''}" data-key="${k}" data-field="kg"><input inputmode="numeric" placeholder="回数" value="${x.reps??''}" data-key="${k}" data-field="reps"><button class="done ${x.done?'on':''}" onclick="toggleDone('${k}')">${x.done?'✓':'○'}</button></div>`}
-const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${autoWarmupText(ex,ei,log)?`<div class="warmup" id="warmup-${ei}"><b>UP</b><br><span>${autoWarmupText(ex,ei,log)}</span></div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
+const c=document.createElement("div");c.className="card";c.innerHTML=`<div class="head"><div class="num">${ei+1}</div><div class="name">${ex.name}<div class="meta">${ex.target} × ${ex.sets}set ｜ 休憩 ${ex.rest}分${ex.minutes?` ｜ 約${ex.minutes}分`:``}${ex.note?` ｜ ${ex.note}`:''}</div></div><button class="iconbtn" onclick="editExercise(${ei})">編集</button></div>${autoWarmupText(ex,ei,log)?`<div class="warmup" id="warmup-${ei}"><b>UP</b><br><span>${autoWarmupText(ex,ei,log)}</span></div>`:''}<div class="prev"><b>前回：</b>${prevText(ex)}</div><div class="sets">${rows}</div><div class="recommend"><b>NEXT</b><br>${nextRecommendation(ex,ei,log)}${oneRMSummaryText(ex)?`<br>${oneRMSummaryText(ex)}`:''}</div><div class="actions"><button class="btn dark" onclick="startTimer(${Math.round(ex.rest*60)})">休憩 ${ex.rest}分スタート</button><button class="btn chartbtn" onclick="openExerciseChart('${ex.name.replace(/'/g,"\\'")}')">推移を見る</button></div>`;list.appendChild(c)});
 progress.textContent=`${done} / ${total}`;document.querySelectorAll("input[data-key]").forEach(el=>el.addEventListener("change",saveLog))}
 function saveLog(){const log=getLog();document.querySelectorAll("input[data-key]").forEach(el=>{const k=el.dataset.key,f=el.dataset.field;log[k]=log[k]||{};log[k][f]=el.value});putLog(log)}
 function toggleDone(k){saveLog();const l=getLog();l[k]=l[k]||{};l[k].done=!l[k].done;putLog(l);if(k===highlightedSetKey && current===highlightedPlan) clearNextHighlight();render();if(l[k].done){const m=(k||"").match(/^e(\d+)s(\d+)$/);if(m){const ei=parseInt(m[1],10),si=parseInt(m[2],10);const ex=getPlans()[current].ex[ei];if(ex && si<ex.sets-1) startTimer(Math.round(ex.rest*60),`e${ei}s${si+1}`,current)}}}
