@@ -167,7 +167,7 @@ function nextRecommendation(ex,ei,log){
   const todayOneRM=Math.max(0,...sets.map(x=>estimated1RM(x.kg,x.reps)));
   const prevInfo=latestAndPrevOneRM(ex.name);
   const prevOneRM=prevInfo?prevInfo.latest:null;
-  const declining=(todayOneRM>0 && prevOneRM!=null && (prevOneRM-todayOneRM)>0.5);
+  const declining=(todayOneRM>0 && prevOneRM!=null && (prevOneRM-todayOneRM)/prevOneRM>=0.02);
   if(declining) return `次回：${usedKg}kg継続。推定1RMがやや低下しているため無理に増量しません。`;
   const step=usedKg<20?1:2.5;
   return `次回：${usedKg+step}kgへアップ候補`;
